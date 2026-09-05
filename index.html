@@ -1,0 +1,787 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Windows Troubleshooting — IT Support</title>
+<style>
+  :root{
+    --ink:#14213D;
+    --paper:#FFFFFF;
+    --wash:#F1F5FA;
+    --line:#D6DEE9;
+    --symptom:#D97316;
+    --tool:#0B6EBF;
+    --resolved:#157F63;
+    --muted:#5C6B80;
+    --rail:64px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    font-family:"Segoe UI",-apple-system,BlinkMacSystemFont,"Helvetica Neue",Arial,sans-serif;
+    color:var(--ink);
+    background:var(--wash);
+    overflow:hidden;
+    -webkit-font-smoothing:antialiased;
+  }
+
+  /* ---------- shell ---------- */
+  #stage{
+    position:fixed; inset:0;
+    display:grid;
+    grid-template-columns:var(--rail) 1fr;
+  }
+  #rail{
+    background:var(--ink);
+    color:#fff;
+    display:flex; flex-direction:column; align-items:center;
+    padding:18px 0; gap:14px;
+  }
+  #rail .num{font-size:20px;font-weight:700;letter-spacing:-.02em}
+  #rail .of{font-size:11px;color:#8FA2BD;margin-top:-6px}
+  #rail .spacer{flex:1}
+  .railbtn{
+    width:40px;height:40px;border:none;border-radius:9px;
+    background:rgba(255,255,255,.10);color:#fff;cursor:pointer;
+    font-size:15px;display:grid;place-items:center;
+    transition:background .15s;
+  }
+  .railbtn:hover{background:rgba(255,255,255,.22)}
+  .railbtn.on{background:var(--tool)}
+  #clock{
+    font-variant-numeric:tabular-nums;
+    font-size:14px;font-weight:700;letter-spacing:-.02em;
+    padding:2px 0;
+  }
+  #clock.over{color:#FFB86B}
+
+  #screen{position:relative;overflow:hidden}
+  .slide{
+    position:absolute; inset:0;
+    padding:40px 56px 34px;
+    overflow-y:auto;
+    display:none;
+    background:var(--wash);
+  }
+  .slide.live{display:block}
+
+  /* ---------- type ---------- */
+  .phase{
+    display:inline-flex;align-items:center;gap:8px;
+    font-size:13px;font-weight:600;color:var(--muted);
+    margin-bottom:10px;
+  }
+  .phase b{color:var(--tool);font-weight:700}
+  h1{font-size:44px;line-height:1.06;letter-spacing:-.028em;font-weight:700;max-width:20ch}
+  h2{font-size:33px;line-height:1.12;letter-spacing:-.022em;font-weight:700;max-width:24ch}
+  h3{font-size:18px;font-weight:700;letter-spacing:-.01em}
+  p{font-size:17px;line-height:1.5;color:#2C3A50;max-width:66ch}
+  .lede{font-size:20px;line-height:1.45;margin-top:14px;max-width:60ch}
+  .sub{color:var(--muted);font-size:15px}
+
+  /* ---------- triage cards ---------- */
+  .triage{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:26px}
+  .tri{
+    background:var(--paper);border:1px solid var(--line);
+    border-top:4px solid var(--tool);
+    border-radius:10px;padding:16px 15px;
+  }
+  .tri .step{font-size:12px;font-weight:700;color:var(--muted);margin-bottom:6px}
+  .tri h3{margin-bottom:6px}
+  .tri p{font-size:14px;line-height:1.4}
+  .tri.s1{border-top-color:var(--symptom)}
+  .tri.s4{border-top-color:var(--resolved)}
+
+  /* ---------- generic panels ---------- */
+  .cols{display:grid;grid-template-columns:1fr 1fr;gap:22px;margin-top:24px;align-items:start}
+  .panel{background:var(--paper);border:1px solid var(--line);border-radius:11px;padding:20px 22px}
+  .panel h3{margin-bottom:10px}
+  .panel ul{margin:0 0 0 18px}
+  .panel li{font-size:16px;line-height:1.62;color:#2C3A50}
+  .panel li b{color:var(--ink)}
+
+  .kbd{
+    display:inline-block;font-family:Consolas,"SF Mono",Menlo,monospace;
+    font-size:14px;background:#EAF0F7;border:1px solid var(--line);
+    border-bottom-width:2px;border-radius:5px;padding:1px 7px;
+    color:var(--ink);white-space:nowrap;
+  }
+  code.cmd{
+    display:block;font-family:Consolas,"SF Mono",Menlo,monospace;
+    background:var(--ink);color:#C6E6FF;padding:12px 15px;border-radius:8px;
+    font-size:15px;margin:10px 0;overflow-x:auto;
+  }
+
+  .callout{
+    border-left:4px solid var(--symptom);
+    background:#FFF6EC;padding:13px 17px;border-radius:0 9px 9px 0;
+    margin-top:18px;font-size:16px;line-height:1.5;
+  }
+  .callout.ask{border-left-color:var(--tool);background:#EDF5FC}
+  .callout.win{border-left-color:var(--resolved);background:#EBF7F2}
+  .callout b{display:block;margin-bottom:3px;font-size:13px;color:var(--muted)}
+
+  /* ---------- poll ---------- */
+  .poll{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:26px}
+  .lvl{
+    background:var(--paper);border:1px solid var(--line);border-radius:10px;
+    padding:16px 14px;text-align:center;cursor:pointer;user-select:none;
+    transition:transform .12s,border-color .12s;
+  }
+  .lvl:hover{border-color:var(--tool);transform:translateY(-2px)}
+  .lvl .n{font-size:13px;font-weight:700;color:var(--tool)}
+  .lvl .t{font-size:14px;line-height:1.35;margin:8px 0 12px;color:#2C3A50}
+  .lvl .c{font-size:30px;font-weight:700;font-variant-numeric:tabular-nums}
+  .pollbar{height:8px;background:#E3EAF3;border-radius:99px;overflow:hidden;margin-top:8px}
+  .pollbar i{display:block;height:100%;background:var(--tool);width:0;transition:width .3s}
+
+  /* ---------- sort activity ---------- */
+  .chips{display:flex;flex-wrap:wrap;gap:9px;margin:18px 0 22px}
+  .chip{
+    background:var(--paper);border:1.5px solid var(--line);border-radius:999px;
+    padding:9px 16px;font-size:15px;cursor:pointer;transition:.13s;
+  }
+  .chip:hover{border-color:var(--tool)}
+  .chip.sel{border-color:var(--tool);background:#EDF5FC;box-shadow:0 0 0 3px rgba(11,110,191,.14)}
+  .chip.done{opacity:.42;pointer-events:none;text-decoration:line-through}
+  .buckets{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+  .bucket{
+    background:var(--paper);border:2px dashed var(--line);border-radius:11px;
+    padding:14px;min-height:132px;cursor:pointer;transition:.13s;
+  }
+  .bucket:hover{border-color:var(--tool);background:#F7FBFF}
+  .bucket h3{font-size:15px;margin-bottom:9px}
+  .bucket .in{display:flex;flex-wrap:wrap;gap:6px}
+  .bucket .in span{
+    font-size:13px;background:var(--wash);border:1px solid var(--line);
+    border-radius:999px;padding:4px 10px;
+  }
+  .bucket .in span.ok{background:#EBF7F2;border-color:#9FD6C3;color:var(--resolved)}
+  .bucket .in span.no{background:#FDEDED;border-color:#F0B4B4;color:#B4291F}
+
+  /* ---------- quiz ---------- */
+  .q{background:var(--paper);border:1px solid var(--line);border-radius:11px;padding:20px 22px;margin-top:16px}
+  .q .qt{font-size:17px;font-weight:600;margin-bottom:13px}
+  .opts{display:grid;gap:8px}
+  .opt{
+    text-align:left;background:var(--wash);border:1.5px solid var(--line);
+    border-radius:8px;padding:11px 14px;font-size:15.5px;cursor:pointer;
+    font-family:inherit;color:var(--ink);transition:.12s;
+  }
+  .opt:hover:not(:disabled){border-color:var(--tool);background:#EDF5FC}
+  .opt:disabled{cursor:default}
+  .opt.right{border-color:var(--resolved);background:#EBF7F2;font-weight:600}
+  .opt.wrong{border-color:#E08C86;background:#FDEDED}
+  .why{font-size:14.5px;color:var(--muted);margin-top:11px;line-height:1.5;display:none}
+  .why.show{display:block}
+  #score{font-size:15px;font-weight:700;color:var(--tool);margin-top:16px}
+
+  /* ---------- compare table ---------- */
+  table{border-collapse:collapse;width:100%;margin-top:20px;background:var(--paper);
+        border:1px solid var(--line);border-radius:10px;overflow:hidden}
+  th,td{padding:12px 15px;text-align:left;font-size:15.5px;border-bottom:1px solid var(--line)}
+  th{background:var(--ink);color:#fff;font-weight:600;font-size:14px}
+  tr:last-child td{border-bottom:none}
+  td:first-child{font-weight:600;width:26%}
+
+  /* ---------- checklist drawer ---------- */
+  #drawer{
+    position:fixed;top:0;right:0;bottom:0;width:352px;background:var(--paper);
+    border-left:1px solid var(--line);box-shadow:-14px 0 40px rgba(20,33,61,.13);
+    transform:translateX(100%);transition:transform .26s cubic-bezier(.4,0,.2,1);
+    z-index:40;padding:24px 24px 20px;overflow-y:auto;
+  }
+  #drawer.open{transform:translateX(0)}
+  #drawer h3{font-size:17px;margin-bottom:4px}
+  #drawer .sub{margin-bottom:16px}
+  .task{
+    display:flex;gap:11px;align-items:flex-start;padding:12px;border:1px solid var(--line);
+    border-radius:9px;margin-bottom:9px;cursor:pointer;transition:.13s;
+  }
+  .task:hover{border-color:var(--tool)}
+  .task .box{
+    width:21px;height:21px;flex:none;border:2px solid var(--line);border-radius:6px;
+    display:grid;place-items:center;font-size:13px;color:#fff;margin-top:1px;
+  }
+  .task.on{background:#EBF7F2;border-color:#9FD6C3}
+  .task.on .box{background:var(--resolved);border-color:var(--resolved)}
+  .task .lbl{font-size:14.5px;line-height:1.4}
+  .task.on .lbl{color:var(--resolved)}
+  #prog{height:9px;background:#E3EAF3;border-radius:99px;overflow:hidden;margin:14px 0 18px}
+  #prog i{display:block;height:100%;background:var(--resolved);width:0;transition:width .3s}
+
+  .hint{font-size:13px;color:var(--muted);margin-top:20px}
+  .fade{animation:f .34s ease both}
+  @keyframes f{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+  @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+
+<div id="stage">
+  <div id="rail">
+    <div class="num" id="rNum">1</div>
+    <div class="of" id="rOf">/13</div>
+    <div id="clock">25:00</div>
+    <button class="railbtn" id="bTimer" title="Start / pause timer">▶</button>
+    <div class="spacer"></div>
+    <button class="railbtn" id="bList" title="Class checklist">☑</button>
+    <button class="railbtn" id="bPrev" title="Previous">↑</button>
+    <button class="railbtn" id="bNext" title="Next">↓</button>
+  </div>
+  <div id="screen"></div>
+</div>
+
+<div id="drawer">
+  <h3>Class progress board</h3>
+  <div class="sub">Tick these off together as the class confirms in chat.</div>
+  <div id="prog"><i></i></div>
+  <div id="tasks"></div>
+  <div class="hint">Nobody moves on alone. If one person is stuck, we all wait — that is how this class works.</div>
+</div>
+
+<script>
+/* ============ CHECKLIST ============ */
+const TASKS = [
+  "Windows environment is open and reachable",
+  "Task Manager opened with Ctrl+Shift+Esc",
+  "Ran one built-in troubleshooter end to end",
+  "Found the Safe Mode path in Recovery",
+  "Ran chkdsk from an admin Command Prompt",
+  "Located System Restore and confirmed a restore point"
+];
+let ticked = new Array(TASKS.length).fill(false);
+
+function paintTasks(){
+  const host = document.getElementById('tasks');
+  host.innerHTML = '';
+  TASKS.forEach((t,i)=>{
+    const d = document.createElement('div');
+    d.className = 'task' + (ticked[i] ? ' on' : '');
+    d.innerHTML = '<div class="box">'+(ticked[i]?'✓':'')+'</div><div class="lbl">'+t+'</div>';
+    d.onclick = ()=>{ ticked[i]=!ticked[i]; paintTasks(); };
+    host.appendChild(d);
+  });
+  const pct = ticked.filter(Boolean).length / TASKS.length * 100;
+  document.querySelector('#prog i').style.width = pct + '%';
+}
+
+/* ============ SLIDES ============ */
+const SLIDES = [];
+
+SLIDES.push({t:'0:00', p:'Welcome', html:`
+  <div class="phase">Windows OS &nbsp;<b>·</b>&nbsp; Session 1</div>
+  <h1>Troubleshooting Windows without guessing</h1>
+  <p class="lede">By the end of the next 25 minutes you will have a repeatable method
+  and five tools you can use on a real ticket — not a list of things to memorise.</p>
+  <div class="callout ask">
+    <b>Before we start — answer in chat with a number</b>
+    Where are you with Windows troubleshooting right now? I will tally it live.
+  </div>
+  <div class="poll" id="pollPre"></div>
+`});
+
+SLIDES.push({t:'2:00', p:'Objectives', html:`
+  <div class="phase">What you will walk out with</div>
+  <h2>Four things, and a way of thinking</h2>
+  <div class="cols">
+    <div class="panel">
+      <h3>You will be able to</h3>
+      <ul>
+        <li>Separate a <b>software</b> problem from a <b>hardware</b> problem before you touch anything</li>
+        <li>Use <b>Task Manager</b> to find what is actually eating the machine</li>
+        <li>Run a <b>built-in troubleshooter</b> instead of reinstalling things</li>
+        <li>Reach <b>Safe Mode</b> and explain why it isolates a fault</li>
+        <li>Check disk health with <b>chkdsk</b> and <b>S.M.A.R.T.</b></li>
+        <li>Choose correctly between <b>Restore</b> and <b>Reset</b></li>
+      </ul>
+    </div>
+    <div class="panel">
+      <h3>How this session runs</h3>
+      <ul>
+        <li>Every tool gets demonstrated, then <b>you do it</b> on your own machine</li>
+        <li>The checklist on the right is our shared progress board</li>
+        <li>Chat is open the whole time — stuck is normal, silent is not</li>
+        <li>We finish with a short check so I know what landed</li>
+      </ul>
+      <div class="callout win" style="margin-top:16px">
+        <b>Ground rule</b>
+        A tech who says "I don't know yet, let me check" is more trusted than one who guesses.
+      </div>
+    </div>
+  </div>
+`});
+
+SLIDES.push({t:'3:00', p:'The method', html:`
+  <div class="phase">The part that matters more than any tool</div>
+  <h2>Symptom is not the same as cause</h2>
+  <p class="lede">Users report symptoms. You get paid to find causes. Every ticket you will ever
+  take runs through these four steps in this order.</p>
+  <div class="triage">
+    <div class="tri s1"><div class="step">Step 1</div><h3>Observe</h3>
+      <p>What exactly happens, when, and how often? "It's slow" is not yet information.</p></div>
+    <div class="tri"><div class="step">Step 2</div><h3>Isolate</h3>
+      <p>Narrow it. One app or everything? One user or all users? Since when?</p></div>
+    <div class="tri"><div class="step">Step 3</div><h3>Test</h3>
+      <p>Change one thing at a time. Change two and you learn nothing from the result.</p></div>
+    <div class="tri s4"><div class="step">Step 4</div><h3>Verify</h3>
+      <p>Confirm with the user, then write down what you did. Undocumented fixes get re-broken.</p></div>
+  </div>
+  <div class="callout">
+    <b>Why this is on the exam and in the job</b>
+    CompTIA calls it the troubleshooting methodology. Employers call it "not making things worse."
+  </div>
+`});
+
+SLIDES.push({t:'5:00', p:'Topic 1', html:`
+  <div class="phase">Common Windows issues &nbsp;<b>·</b>&nbsp; group activity</div>
+  <h2>Software, hardware, or could be either?</h2>
+  <p>Click a symptom, then click the bucket you think it belongs in. Argue with me if you disagree.</p>
+  <div class="chips" id="chips"></div>
+  <div class="buckets">
+    <div class="bucket" data-b="soft"><h3>Software</h3><div class="in"></div></div>
+    <div class="bucket" data-b="hard"><h3>Hardware</h3><div class="in"></div></div>
+    <div class="bucket" data-b="both"><h3>Could be either</h3><div class="in"></div></div>
+  </div>
+  <div class="callout" id="sortNote" style="display:none">
+    <b>The takeaway</b>
+    Most of these are honestly "either" until you test. A blue screen can be a bad driver
+    <em>or</em> failing RAM. That ambiguity is exactly why you isolate before you act.
+  </div>
+`});
+
+SLIDES.push({t:'7:00', p:'Topic 2 · Live', html:`
+  <div class="phase">Tool 1 &nbsp;<b>·</b>&nbsp; follow along now</div>
+  <h2>Task Manager: what is actually eating this machine</h2>
+  <div class="cols">
+    <div class="panel">
+      <h3>Open it</h3>
+      <p style="font-size:16px"><span class="kbd">Ctrl</span> + <span class="kbd">Shift</span> + <span class="kbd">Esc</span></p>
+      <p class="sub" style="margin-top:8px">Ctrl+Alt+Del also works but costs you two extra clicks. Learn the fast one.</p>
+      <h3 style="margin-top:18px">What to look at</h3>
+      <ul>
+        <li><b>Processes</b> — sort by CPU, then Memory. The top row is your suspect.</li>
+        <li><b>Startup apps</b> — the single most common cause of "my computer is slow since I got it"</li>
+        <li><b>Status column</b> — "Not responding" tells you the app is hung, not the OS</li>
+      </ul>
+    </div>
+    <div class="panel">
+      <h3>Your turn — 60 seconds</h3>
+      <ul>
+        <li>Open Task Manager</li>
+        <li>Sort Processes by Memory, highest first</li>
+        <li>Put the name of your top process in chat</li>
+      </ul>
+      <div class="callout ask" style="margin-top:14px">
+        <b>Prediction before we look</b>
+        Who thinks their browser is number one? React with 👍 in Zoom.
+      </div>
+      <div class="callout" style="margin-top:12px">
+        <b>Judgement, not reflex</b>
+        End task is not a fix, it is a pause button. If the same process hangs daily,
+        the real ticket is about that app or its driver.
+      </div>
+    </div>
+  </div>
+`});
+
+SLIDES.push({t:'10:00', p:'Topic 2 · Live', html:`
+  <div class="phase">Tool 2 &nbsp;<b>·</b>&nbsp; follow along now</div>
+  <h2>Built-in troubleshooters</h2>
+  <div class="callout ask">
+    <b>Hands up — this is not hypothetical</b>
+    Who had to fight with a microphone, speaker or camera to join this exact Zoom call?
+    That is the audio troubleshooter's entire job, and most people never open it.
+  </div>
+  <div class="cols">
+    <div class="panel">
+      <h3>Where they live</h3>
+      <code class="cmd">Settings › System › Troubleshoot › Other troubleshooters</code>
+      <p class="sub">Windows 10: Settings › Update &amp; Security › Troubleshoot</p>
+      <h3 style="margin-top:16px">Worth knowing by name</h3>
+      <ul>
+        <li><b>Internet Connections</b> — resets the adapter stack</li>
+        <li><b>Playing Audio</b> — wrong default output device, nine times out of ten</li>
+        <li><b>Windows Update</b> — clears a stuck update cache</li>
+        <li><b>Printer</b> — the ticket you will close most often in your first year</li>
+      </ul>
+    </div>
+    <div class="panel">
+      <h3>Your turn — 90 seconds</h3>
+      <ul>
+        <li>Open <b>Other troubleshooters</b></li>
+        <li>Run <b>Playing Audio</b> all the way to the end</li>
+        <li>Chat me what it reported, even if it found nothing</li>
+      </ul>
+      <div class="callout win" style="margin-top:14px">
+        <b>Why this matters on a real desk</b>
+        It is free, it is fast, and it produces a log you can paste into a ticket.
+        "I ran the troubleshooter, here is what it found" is a better first line than "I restarted it."
+      </div>
+    </div>
+  </div>
+`});
+
+SLIDES.push({t:'13:00', p:'Topic 3', html:`
+  <div class="phase">Isolating a fault</div>
+  <h2>Safe Mode: the smallest possible Windows</h2>
+  <div class="cols">
+    <div class="panel">
+      <h3>What it actually does</h3>
+      <p>Boots with only the drivers and services Windows cannot start without. No third-party
+      software, minimal graphics, nothing extra.</p>
+      <div class="callout win" style="margin-top:14px">
+        <b>The logic</b>
+        If the problem disappears in Safe Mode, the cause is something Safe Mode left out.
+        If the problem is still there, look at hardware or Windows itself. One boot, half the search space gone.
+      </div>
+    </div>
+    <div class="panel">
+      <h3>Two ways in</h3>
+      <p style="font-size:16px"><b>From a working machine</b></p>
+      <code class="cmd">Settings › System › Recovery › Restart now</code>
+      <p style="font-size:16px;margin-top:10px"><b>From a machine that will not boot</b></p>
+      <p>Interrupt startup three times. Windows opens the recovery environment for you.</p>
+      <code class="cmd">Troubleshoot › Advanced options › Startup Settings › Restart › 4</code>
+      <div class="callout" style="margin-top:12px">
+        <b>Do not reboot into it right now</b>
+        You would drop out of this call. Find the screen, stop at the button, chat me a ✋ when you see it.
+      </div>
+    </div>
+  </div>
+`});
+
+SLIDES.push({t:'16:00', p:'Topic 4 · Live', html:`
+  <div class="phase">Tool 3 &nbsp;<b>·</b>&nbsp; follow along now</div>
+  <h2>Is the disk lying to you?</h2>
+  <div class="cols">
+    <div class="panel">
+      <h3>chkdsk — check the filesystem</h3>
+      <p class="sub">Right-click Start › Terminal (Admin) or Command Prompt (Admin)</p>
+      <code class="cmd">chkdsk C:</code>
+      <p style="font-size:15.5px">Read-only. Safe to run right now, reports without changing anything.</p>
+      <code class="cmd">chkdsk C: /f /r</code>
+      <p style="font-size:15.5px">Fixes errors and recovers readable data. Needs the drive offline,
+      so it schedules itself for the next restart. Can take hours on a large disk.</p>
+      <div class="callout" style="margin-top:12px">
+        <b>Run the read-only one now</b>
+        Do not run /f /r on your own machine during class. Chat me the last line of your output.
+      </div>
+    </div>
+    <div class="panel">
+      <h3>S.M.A.R.T. — ask the drive about itself</h3>
+      <H4>Self-Monitoring, Analysis and Reporting Technology</h4>
+      <p>The drive keeps its own health counters. chkdsk checks the <em>filing system</em>;
+      S.M.A.R.T. checks the <em>physical device</em>. Different questions.</p>
+      <code class="cmd"> Get-PhysicalDisk | Select-Object FriendlyName, MediaType, HealthStatus, OperationalStatus</code>
+      <p style="font-size:15.5px">Returns OK or Pred Fail. Blunt, but built in and instant.</p>
+      <p style="font-size:15.5px;margin-top:10px">For real detail, third-party tools like <b>CrystalDiskInfo</b>
+      show reallocated sector counts and power-on hours.</p>
+      <div class="callout" style="margin-top:12px">
+        <b>Read this in a ticket</b>
+        Rising reallocated sectors means the drive is failing even while it still works.
+        Your job at that point is back up now, not repair.
+      </div>
+    </div>
+  </div>
+`});
+
+SLIDES.push({t:'19:00', p:'Topic 5 · Live', html:`
+  <div class="phase">The two big buttons</div>
+  <h2>Restore rewinds. Reset rebuilds.</h2>
+  <table>
+    <tr><th></th><th>System Restore</th><th>System Reset</th></tr>
+    <tr><td>What changes</td><td>System files, registry, drivers, installed programs</td><td>Windows is reinstalled from scratch</td></tr>
+    <tr><td>Your files</td><td>Untouched</td><td>Kept or removed — you choose, and the choice is final</td></tr>
+    <tr><td>Your apps</td><td>Anything installed after the restore point is gone</td><td>All gone, every time</td></tr>
+    <tr><td>Time</td><td>Roughly 15–30 minutes</td><td>An hour or more</td></tr>
+    <tr><td>Reach for it when</td><td>It broke recently and you know roughly when</td><td>Corruption, malware, or you are out of options</td></tr>
+  </table>
+  <div class="cols" style="margin-top:20px">
+    <div class="panel">
+      <h3>Find it now — do not run it</h3>
+      <code class="cmd">rstrui.exe</code>
+      <p style="font-size:15.5px">Or: Control Panel › Recovery › Open System Restore.
+      Look at the list of restore points and chat me the date of your oldest one.</p>
+    </div>
+    <div class="panel">
+      <h3>The part people skip</h3>
+      <p style="font-size:15.5px">If no restore points exist, protection was never turned on.
+      Turning it on is a five-second job that saves a four-hour one.</p>
+      <code class="cmd">System Properties › System Protection › Configure</code>
+    </div>
+  </div>
+`});
+
+SLIDES.push({t:'21:00', p:'Non-negotiable', html:`
+  <div class="phase">Before any of the above</div>
+  <h2>Back up first. Every time. No exceptions.</h2>
+  <p class="lede">Restore, reset, chkdsk /f /r, driver rollbacks — all of them can go wrong.
+  A backup is the difference between a bad afternoon and a lost job.</p>
+  <div class="cols">
+    <div class="panel">
+      <h3>What earns you trust</h3>
+      <ul>
+        <li>Ask before you act, especially before anything destructive</li>
+        <li>Tell the user what you are about to do in plain words</li>
+        <li>Write down what you did and what happened</li>
+      </ul>
+    </div>
+    <div class="panel">
+      <h3>What loses it</h3>
+      <ul>
+        <li>Resetting a machine without checking where the files live</li>
+        <li>Changing three things and not knowing which one worked</li>
+        <li>Saying "it should be fine"</li>
+      </ul>
+    </div>
+  </div>
+`});
+
+SLIDES.push({t:'22:00', p:'Check for understanding', html:`
+  <div class="phase">Five questions &nbsp;<b>·</b>&nbsp; answer in chat, then I reveal</div>
+  <h2>Did it land?</h2>
+  <div id="quiz"></div>
+  <div id="score"></div>
+`});
+
+SLIDES.push({t:'24:00', p:'Going further', html:`
+  <div class="phase">Bonus &nbsp;<b>·</b>&nbsp; using AI without outsourcing your judgement</div>
+  <h2>Prompts that make you faster, not lazier</h2>
+  <p>AI will not troubleshoot for you. It is very good at the parts around troubleshooting:
+  reading logs, drafting scripts, and turning a fix into a ticket note.</p>
+  <div class="cols">
+    <div class="panel">
+      <h3>Decode an error</h3>
+      <code class="cmd">I have a Windows stop code 0x0000007E after installing
+a display driver. Explain the likely cause in plain
+language, then give me three checks in the order I
+should try them, safest first.</code>
+      <h3 style="margin-top:14px">Turn a fix into a ticket note</h3>
+      <code class="cmd">Write a 3-sentence ticket resolution note. Audience is
+a non-technical user. Cause, what I did, what they
+should watch for.</code>
+    </div>
+    <div class="panel">
+      <h3>Draft a triage script</h3>
+      <code class="cmd">Write a PowerShell script that reports free disk space,
+top 5 processes by memory, and last 5 System event log
+errors. Add comments explaining each line so I can learn
+from it, and do not make any changes to the system.</code>
+      <div class="callout" style="margin-top:14px">
+        <b>The rule that keeps you employed</b>
+        Never run a script you cannot read. Ask it to explain every line, then check
+        the explanation against the docs. AI is confident when it is wrong.
+      </div>
+    </div>
+  </div>
+  <p class="sub" style="margin-top:16px">Full prompt library, including log analysis and study prompts, is in your handout.</p>
+`});
+
+SLIDES.push({t:'25:00', p:'Close', html:`
+  <div class="phase">Where we got to</div>
+  <h2>Five tools and one habit</h2>
+  <div class="cols">
+    <div class="panel">
+      <h3>The tools</h3>
+      <ul>
+        <li><b>Task Manager</b> — what is consuming the machine</li>
+        <li><b>Troubleshooters</b> — the free first attempt that produces a log</li>
+        <li><b>Safe Mode</b> — cut the search space in half with one boot</li>
+        <li><b>chkdsk and S.M.A.R.T.</b> — filesystem versus physical drive</li>
+        <li><b>Restore and Reset</b> — rewind versus rebuild</li>
+      </ul>
+    </div>
+    <div class="panel">
+      <h3>The habit</h3>
+      <p style="font-size:17px">Observe, isolate, test one thing, verify. Back up before anything destructive.</p>
+      <div class="callout ask" style="margin-top:14px">
+        <b>Same question as when we started</b>
+        Where are you now? Chat a number 1 to 4.
+      </div>
+      <div class="poll" id="pollPost"></div>
+    </div>
+  </div>
+  <p class="sub" style="margin-top:18px">Handout with the full lab steps and the AI prompt library is in the chat. Do the lab before next session.</p>
+`});
+
+/* ============ RENDER ============ */
+const screen = document.getElementById('screen');
+SLIDES.forEach((s,i)=>{
+  const d = document.createElement('section');
+  d.className = 'slide';
+  d.dataset.i = i;
+  d.innerHTML = s.html;
+  screen.appendChild(d);
+});
+document.getElementById('rOf').textContent = '/' + SLIDES.length;
+
+let cur = 0;
+function go(n){
+  if(n<0 || n>=SLIDES.length) return;
+  document.querySelectorAll('.slide').forEach(s=>s.classList.remove('live','fade'));
+  const s = document.querySelector('.slide[data-i="'+n+'"]');
+  s.classList.add('live','fade');
+  s.scrollTop = 0;
+  cur = n;
+  document.getElementById('rNum').textContent = n+1;
+}
+document.getElementById('bNext').onclick = ()=>go(cur+1);
+document.getElementById('bPrev').onclick = ()=>go(cur-1);
+document.addEventListener('keydown', e=>{
+  if(e.key==='ArrowRight'||e.key==='ArrowDown'||e.key===' '){e.preventDefault();go(cur+1);}
+  if(e.key==='ArrowLeft' ||e.key==='ArrowUp'){e.preventDefault();go(cur-1);}
+  if(e.key==='c'||e.key==='C'){toggleDrawer();}
+});
+
+/* ============ DRAWER ============ */
+function toggleDrawer(){
+  document.getElementById('drawer').classList.toggle('open');
+  document.getElementById('bList').classList.toggle('on');
+}
+document.getElementById('bList').onclick = toggleDrawer;
+paintTasks();
+
+/* ============ TIMER ============ */
+let left = 25*60, running = false, tick = null;
+function paintClock(){
+  const m = Math.floor(Math.abs(left)/60), s = Math.abs(left)%60;
+  const el = document.getElementById('clock');
+  el.textContent = (left<0?'-':'') + m + ':' + String(s).padStart(2,'0');
+  el.classList.toggle('over', left<=120);
+}
+document.getElementById('bTimer').onclick = function(){
+  running = !running;
+  this.textContent = running ? '❚❚' : '▶';
+  if(running){ tick = setInterval(()=>{ left--; paintClock(); }, 1000); }
+  else { clearInterval(tick); }
+};
+paintClock();
+
+/* ============ POLLS ============ */
+const LEVELS = [
+  {n:'1', t:'I have never opened Task Manager'},
+  {n:'2', t:'I have poked around but I guess a lot'},
+  {n:'3', t:'I can fix common things with time'},
+  {n:'4', t:'People already bring me their laptops'}
+];
+const counts = {pre:[0,0,0,0], post:[0,0,0,0]};
+
+function buildPoll(id, key){
+  const host = document.getElementById(id);
+  if(!host) return;
+  host.innerHTML = '';
+  LEVELS.forEach((L,i)=>{
+    const d = document.createElement('div');
+    d.className = 'lvl';
+    d.innerHTML = '<div class="n">'+L.n+'</div><div class="t">'+L.t+'</div>'+
+                  '<div class="c">'+counts[key][i]+'</div><div class="pollbar"><i></i></div>';
+    d.onclick = ()=>{ counts[key][i]++; buildPoll(id,key); };
+    d.oncontextmenu = e=>{ e.preventDefault(); if(counts[key][i]>0) counts[key][i]--; buildPoll(id,key); };
+    host.appendChild(d);
+  });
+  const max = Math.max(1, ...counts[key]);
+  host.querySelectorAll('.pollbar i').forEach((b,i)=>{
+    b.style.width = (counts[key][i]/max*100) + '%';
+  });
+}
+buildPoll('pollPre','pre');
+buildPoll('pollPost','post');
+
+/* ============ SORT ACTIVITY ============ */
+const SYMPTOMS = [
+  {s:'Blue Screen of Death',        a:'both', why:'A bad driver or failing RAM. You cannot tell from the screen alone.'},
+  {s:'One app stops responding',    a:'soft', why:'The OS is fine. The app is hung.'},
+  {s:'Machine will not power on',   a:'hard', why:'Power supply, cable or board. Software never gets a turn.'},
+  {s:'Wi-Fi drops every few minutes',a:'both',why:'Adapter driver, or a dying card, or the router.'},
+  {s:'Printer prints garbled text', a:'soft', why:'Almost always the wrong driver.'}
+];
+let picked = null;
+
+function buildSort(){
+  const host = document.getElementById('chips');
+  if(!host) return;
+  host.innerHTML = '';
+  SYMPTOMS.forEach((x,i)=>{
+    const c = document.createElement('div');
+    c.className = 'chip';
+    c.textContent = x.s;
+    c.dataset.i = i;
+    c.onclick = ()=>{
+      document.querySelectorAll('#chips .chip').forEach(z=>z.classList.remove('sel'));
+      c.classList.add('sel');
+      picked = i;
+    };
+    host.appendChild(c);
+  });
+  document.querySelectorAll('.bucket').forEach(b=>{
+    b.onclick = ()=>{
+      if(picked===null) return;
+      const x = SYMPTOMS[picked];
+      const ok = (x.a === b.dataset.b);
+      const tag = document.createElement('span');
+      tag.className = ok ? 'ok' : 'no';
+      tag.textContent = x.s;
+      tag.title = x.why;
+      b.querySelector('.in').appendChild(tag);
+      document.querySelector('#chips .chip[data-i="'+picked+'"]').classList.add('done');
+      picked = null;
+      if(document.querySelectorAll('#chips .chip.done').length === SYMPTOMS.length){
+        document.getElementById('sortNote').style.display = 'block';
+      }
+    };
+  });
+}
+buildSort();
+
+/* ============ QUIZ ============ */
+const QUIZ = [
+  {q:'A user says their laptop is slow. What is your first move?',
+   o:['Reset Windows','Ask when it started and whether it is one app or everything','Run chkdsk /f /r','Reinstall the browser'],
+   a:1, w:'Observe and isolate before you touch anything. Everything else is guessing.'},
+  {q:'Which shortcut opens Task Manager directly?',
+   o:['Ctrl + Alt + Del','Ctrl + Shift + Esc','Windows + R','Alt + F4'],
+   a:1, w:'Ctrl+Alt+Del gets you a menu first. Ctrl+Shift+Esc goes straight there.'},
+  {q:'The problem disappears in Safe Mode. What does that tell you?',
+   o:['The hard drive is failing','The cause is something Safe Mode did not load','Windows must be reinstalled','It was a power issue'],
+   a:1, w:'Safe Mode loads minimal drivers and no third-party software. If the fault vanishes, the cause is in what it left out.'},
+  {q:'What is the difference between chkdsk and S.M.A.R.T.?',
+   o:['They are the same thing','chkdsk checks the filesystem, S.M.A.R.T. reports physical drive health','chkdsk is for SSDs only','S.M.A.R.T. repairs bad sectors'],
+   a:1, w:'Two different questions: is the filing system consistent, and is the physical device healthy.'},
+  {q:'A user needs their machine working but must keep their files. Restore or Reset?',
+   o:['Reset, and remove everything','System Restore first','Reset, keeping files, immediately','Neither, replace the drive'],
+   a:1, w:'Restore is faster, less destructive and leaves personal files alone. Try the reversible option first.'}
+];
+let correct = 0, answered = 0;
+
+function buildQuiz(){
+  const host = document.getElementById('quiz');
+  if(!host) return;
+  host.innerHTML = '';
+  QUIZ.forEach((Q,qi)=>{
+    const d = document.createElement('div');
+    d.className = 'q';
+    let h = '<div class="qt">'+(qi+1)+'. '+Q.q+'</div><div class="opts">';
+    Q.o.forEach((o,oi)=>{ h += '<button class="opt" data-q="'+qi+'" data-o="'+oi+'">'+o+'</button>'; });
+    h += '</div><div class="why" id="w'+qi+'">'+Q.w+'</div>';
+    d.innerHTML = h;
+    host.appendChild(d);
+  });
+  host.querySelectorAll('.opt').forEach(b=>{
+    b.onclick = ()=>{
+      const qi = +b.dataset.q, oi = +b.dataset.o, Q = QUIZ[qi];
+      const sibs = b.parentElement.querySelectorAll('.opt');
+      if([...sibs].some(s=>s.disabled)) return;
+      sibs.forEach((s,si)=>{
+        s.disabled = true;
+        if(si === Q.a) s.classList.add('right');
+        else if(si === oi) s.classList.add('wrong');
+      });
+      document.getElementById('w'+qi).classList.add('show');
+      answered++;
+      if(oi === Q.a) correct++;
+      document.getElementById('score').textContent =
+        'Answered ' + answered + ' of ' + QUIZ.length + ' — ' + correct + ' correct';
+    };
+  });
+}
+buildQuiz();
+
+go(0);
+</script>
