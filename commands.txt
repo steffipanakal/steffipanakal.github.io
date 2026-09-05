@@ -1,0 +1,13 @@
+chkdsk C:
+chkdsk C: /scan
+chkdsk C: /spotfix
+////scan runs online with no downtime. /spotfix then fixes only what the scan flagged, taking seconds instead of hours.
+
+Get-PhysicalDisk | Get-StorageReliabilityCounter
+Get-PhysicalDisk | Select-Object FriendlyName, MediaType, HealthStatus, OperationalStatus
+Get-PhysicalDisk | Get-StorageReliabilityCounter |...
+Get-PhysicalDisk | Where-Object HealthStatus -ne 'Healthy'
+Get-Volume
+
+
+> System Restore protects Windows from itself. A backup protects the user from everything, including you.
